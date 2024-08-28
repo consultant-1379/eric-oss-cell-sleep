@@ -1,0 +1,79 @@
+#
+# COPYRIGHT Ericsson 2021
+#
+#
+#
+# The copyright to the computer program(s) herein is the property of
+#
+# Ericsson Inc. The programs may be used and/or copied only with written
+#
+# permission from Ericsson Inc. or in accordance with the terms and
+#
+# conditions stipulated in the agreement/contract under which the
+#
+# program(s) have been supplied.
+#
+
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "eric-oss-cell-sleep.name" .}}-route-configmap
+  labels:
+    app: {{ template "eric-oss-cell-sleep.name" . }}
+  {{- include "eric-oss-cell-sleep.labels" .| nindent 4 }}
+  annotations:
+  {{- include "eric-oss-cell-sleep.product-info" .| nindent 4 }}
+data:
+  route.json: |
+    {
+      "id": "{{ index .Values "api-gateway-route" "route-path" "route-id" }}",
+      "predicates": [
+        {
+          "name": "Path",
+          "args": {
+            "_genkey_0": "{{ index .Values "api-gateway-route" "route-path" "path" }}"
+          }
+        },
+        {
+          "name": "Host",
+          "args": {
+            "_genkey_0": "{{.Values.global.hosts.so}}"
+          }
+        }
+      ],
+
+      "filters": [
+        {
+          "name": "AddRequestHeader",
+          "args": {
+            "_genkey_0": "X-RateLimit-Map-Name",
+            "_genkey_1": "so-rate-limiter"
+          }
+        },
+        {
+          "name": "AddRequestHeader",
+          "args": {
+            "_genkey_0": "X-RateLimit-Max-Access",
+            "_genkey_1": "500"
+          }
+        },
+        {
+          "name": "AddRequestHeader",
+          "args": {
+            "_genkey_0": "X-RateLimit-Reset-Time",
+            "_genkey_1": "15"
+          }
+        },
+        {
+          "name": "RateLimitFilter",
+          "args": {}
+        },
+        {
+          "name": "AddUserNameCookieFilter",
+          "args": {}
+        }
+      ],
+      "uri": "http://{{ include "eric-oss-cell-sleep.name" . }}:8080",
+      "order": 0
+    }

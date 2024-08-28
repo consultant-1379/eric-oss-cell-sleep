@@ -1,0 +1,106 @@
+#
+# COPYRIGHT Ericsson 2021
+#
+#
+#
+# The copyright to the computer program(s) herein is the property of
+#
+# Ericsson Inc. The programs may be used and/or copied only with written
+#
+# permission from Ericsson Inc. or in accordance with the terms and
+#
+# conditions stipulated in the agreement/contract under which the
+#
+# program(s) have been supplied.
+#
+
+  {{- if (index .Values "api-gateway-route" "enabled") -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "eric-oss-cell-sleep.name" .}}-creates-route-hook
+  labels:
+    app: {{ template "eric-oss-cell-sleep.name" . }}
+{{- include "eric-oss-cell-sleep.labels" .| nindent 4 }}
+  annotations:
+  {{- include "eric-oss-cell-sleep.product-info" .| nindent 4 }}
+    "helm.sh/hook": post-install
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+    {{- include "eric-oss-cell-sleep.service-mesh-hook-annotations" . | nindent 4 }}
+spec:
+  backoffLimit: 8
+  template:
+    spec:
+      serviceAccountName: {{ include "eric-oss-cell-sleep.name" . }}
+      {{- if include "eric-oss-cell-sleep.pullSecret" . }}
+      imagePullSecrets:
+        - name: {{ include "eric-oss-cell-sleep.pullSecret" . | quote }}
+      {{- end }}
+      restartPolicy: never
+      containers:
+        - name: api-gateway-client
+          image: {{ include "eric-oss-cell-sleep.apiGatewayClientPath" . }}
+          imagePullPolicy: {{ include "eric-oss-cell-sleep.registryImagePullPolicy" . }}
+          env:
+            - name: SYSTEM_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ index .Values "api-gateway-route" "credentials" "name" }}
+                  key: {{ index .Values "api-gateway-route" "credentials" "user-key" }}
+            - name: SYSTEM_USER_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ index .Values "api-gateway-route" "credentials" "name" }}
+                  key: {{ index .Values "api-gateway-route" "credentials" "pwd-key" }}
+          args:
+            - "{{ index .Values "api-gateway-route" "route-path" "tag" }}"
+            - "https://{{.Values.global.hosts.so}}/auth/v1/login/"
+            - "$(SYSTEM_USER)"
+            - "$(SYSTEM_USER_PASSWORD)"
+            - "upgrade"
+            - "/config/route.json"
+          resources:
+            requests:
+            {{- if (index .Values "resources" "eric-api-gateway-client" "requests" "cpu") }}
+              cpu: {{ (index .Values "resources" "eric-api-gateway-client" "requests" "cpu" | quote) }}
+            {{- end }}
+            {{- if (index .Values "resources" "eric-api-gateway-client" "requests" "memory") }}
+              memory: {{ (index .Values "resources" "eric-api-gateway-client" "requests" "memory" | quote) }}
+            {{- end }}
+            {{- if (index .Values "resources" "eric-api-gateway-client" "requests" "ephemeral-storage") }}
+              ephemeral-storage: {{ (index .Values "resources" "eric-api-gateway-client" "requests" "ephemeral-storage" | quote) }}
+            {{- end }}
+            limits:
+            {{- if (index .Values "resources" "eric-api-gateway-client" "limits" "cpu") }}
+              cpu: {{ (index .Values "resources" "eric-api-gateway-client" "limits" "cpu" | quote) }}
+            {{- end }}
+            {{- if (index .Values "resources" "eric-api-gateway-client" "limits" "memory") }}
+              memory: {{ (index .Values "resources" "eric-api-gateway-client" "limits" "memory" | quote) }}
+            {{- end }}
+            {{- if (index .Values "resources" "eric-api-gateway-client" "limits" "ephemeral-storage") }}
+              ephemeral-storage: {{ (index .Values "resources" "eric-api-gateway-client" "limits" "ephemeral-storage" | quote) }}
+            {{- end }}
+          volumeMounts:
+            - name: {{ index .Values "api-gateway-route" "route-path" "route-id" }}-route-configuration-volume
+              mountPath: /config
+          securityContext:
+            allowPrivilegeEscalation: true
+            runAsNonRoot: false
+            runAsUser: 0
+            readOnlyRootFilesystem: true
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- include "eric-oss-cell-sleep.tolerations" . | nindent 8 }}
+      {{- end }}
+
+      {{- if (index .Values "podPriority" "eric-oss-cell-sleep" "priorityClassName") }}
+      priorityClassName: {{ (index .Values "podPriority" "eric-oss-cell-sleep" "priorityClassName") }}
+      {{- end }}
+
+      volumes:
+        - name: {{ index .Values "api-gateway-route" "route-path" "route-id" }}-route-configuration-volume
+          configMap:
+            name: {{ index .Values "api-gateway-route" "route-path" "route-id" }}-route-configmap
+            defaultMode: 0777
+{{- end }}

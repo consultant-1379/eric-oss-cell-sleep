@@ -1,0 +1,43 @@
+#
+# COPYRIGHT Ericsson 2021
+#
+#
+#
+# The copyright to the computer program(s) herein is the property of
+#
+# Ericsson Inc. The programs may be used and/or copied only with written
+#
+# permission from Ericsson Inc. or in accordance with the terms and
+#
+# conditions stipulated in the agreement/contract under which the
+#
+# program(s) have been supplied.
+#
+
+{{- $serviceMesh := include "eric-oss-cell-sleep.service-mesh-enabled" . | trim -}}
+{{- $tls := include "eric-oss-cell-sleep.global-security-tls-enabled" . | trim -}}
+{{- if eq $serviceMesh "true" }}
+
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: {{ template "eric-oss-cell-sleep.fullname" . }}-destinationrule
+  labels:
+    {{- include "eric-oss-cell-sleep.labels" . | nindent 4 }}
+  annotations:
+    {{- include "eric-oss-cell-sleep.prometheus" . | nindent 4 }}
+    {{- include "eric-oss-cell-sleep.annotations" . | nindent 4 }}
+  generation: 1
+spec:
+  host: {{ template "eric-oss-cell-sleep.fullname" . }}
+  trafficPolicy:
+    tls:
+      {{- if eq $tls "true" }}
+      mode: ISTIO_MUTUAL
+      {{- else }}
+      mode: DISABLE
+      {{- end }}
+    loadBalancer:
+      consistentHash:
+        minimumRingSize: 1024
+{{- end }}

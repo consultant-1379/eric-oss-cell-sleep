@@ -1,0 +1,33 @@
+#
+# COPYRIGHT Ericsson 2021
+#
+#
+#
+# The copyright to the computer program(s) herein is the property of
+#
+# Ericsson Inc. The programs may be used and/or copied only with written
+#
+# permission from Ericsson Inc. or in accordance with the terms and
+#
+# conditions stipulated in the agreement/contract under which the
+#
+# program(s) have been supplied.
+#
+
+productName: "eric-oss-cell-sleep HELM"
+productNumber: "CXC 201 0000"
+images:
+  eric-oss-cell-sleep:
+    productName: "eric-oss-cell-sleep IMAGE"
+    productNumber: "CXC 201 0001"
+    registry: "selidocker.seli.gic.ericsson.se"
+    repoPath: "proj-cbpirates/eric-oss-cell-sleep"
+    name: "eric-oss-cell-sleep"
+    tag: "1.0.ezszila"
+  api-gateway-client:
+    productName: "eric-api-gateway-client"
+    productNumber: ""
+    registry: "armdocker.rnd.ericsson.se"
+    repoPath: "proj-eric-oss-drop"
+    name: "eric-api-gateway-client"
+    tag: "1.0.34-1"

@@ -1,0 +1,46 @@
+{{- if .Values.networkPolicy.enabled }}
+#
+# COPYRIGHT Ericsson 2021
+#
+#
+#
+# The copyright to the computer program(s) herein is the property of
+#
+# Ericsson Inc. The programs may be used and/or copied only with written
+#
+# permission from Ericsson Inc. or in accordance with the terms and
+#
+# conditions stipulated in the agreement/contract under which the
+#
+# program(s) have been supplied.
+#
+
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ template "eric-oss-cell-sleep.fullname" . }}-networkpolicy
+  labels:
+    {{- include "eric-oss-cell-sleep.labels" . | nindent 4 }}
+  annotations:
+    {{- include "eric-oss-cell-sleep.prometheus" . | nindent 4 }}
+    {{- include "eric-oss-cell-sleep.annotations" . | nindent 4 }}
+  generation: 1
+spec:
+  podSelector:
+    matchLabels: {{- include "eric-oss-cell-sleep.selectorLabels" . | nindent 6 }}
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {{- include "eric-oss-cell-sleep.selectorLabels" . | nindent 14 }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: eric-eo-api-gateway
+        - podSelector:
+            matchLabels:
+              app: eric-pm-server
+      ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+  policyTypes:
+    - Ingress
+{{- end }}

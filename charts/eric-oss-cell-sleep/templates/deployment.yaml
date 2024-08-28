@@ -1,0 +1,213 @@
+#
+# COPYRIGHT Ericsson 2021
+#
+#
+#
+# The copyright to the computer program(s) herein is the property of
+#
+# Ericsson Inc. The programs may be used and/or copied only with written
+#
+# permission from Ericsson Inc. or in accordance with the terms and
+#
+# conditions stipulated in the agreement/contract under which the
+#
+# program(s) have been supplied.
+#
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eric-oss-cell-sleep.fullname" . }}
+  labels:
+  {{- include "eric-oss-cell-sleep.labels" . | nindent 4 }}
+  annotations:
+  {{- include "eric-oss-cell-sleep.prometheus" . | nindent 4 }}
+  {{- include "eric-oss-cell-sleep.annotations" . | nindent 4 }}
+spec:
+{{- if not .Values.autoScaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "eric-oss-cell-sleep.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  strategy:
+    type: {{ .Values.updateStrategy.type | quote }}
+    {{- if and (eq .Values.updateStrategy.type "RollingUpdate") .Values.updateStrategy.rollingUpdate }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.updateStrategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.updateStrategy.rollingUpdate.maxSurge }}
+    {{- end }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "eric-oss-cell-sleep.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ include "eric-oss-cell-sleep.version" . }}
+        {{- include "eric-oss-cell-sleep.service-mesh-inject" .| nindent 8 }}
+      annotations:
+{{- include "eric-oss-cell-sleep.prometheus" . | nindent 8 }}
+{{- include "eric-oss-cell-sleep.product-info" . | indent 8 }}
+{{- include "eric-oss-cell-sleep.config-annotations" . | indent 8 }}
+{{- include "eric-oss-cell-sleep.container-annotations" . | indent 8 }}
+{{- include "eric-oss-cell-sleep.service-mesh-inject" .| nindent 8 }}
+{{- include "eric-oss-cell-sleep.service-mesh-version" .| nindent 8 }}
+{{- include "eric-oss-cell-sleep.service-mesh-volume" .| nindent 8 }}
+    spec:
+      {{- if include "eric-oss-cell-sleep.pullSecret" . }}
+      imagePullSecrets:
+        - name: {{ include "eric-oss-cell-sleep.pullSecret" . | quote}}
+      {{- end }}
+      serviceAccountName: {{ template "eric-oss-cell-sleep.fullname" . }}
+      securityContext:
+        fsGroup: {{ include "eric-oss-cell-sleep.fsGroup.coordinated" . }}
+        {{- include "eric-oss-cell-sleep.seccomp-profile" . | indent 8 }}
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+        - name: config-volume
+          configMap:
+            defaultMode: 493
+            name: {{ include "eric-oss-cell-sleep.name" . }}-configmap
+      containers:
+        - name: eric-oss-cell-sleep
+          image: {{ template "eric-oss-cell-sleep.mainImagePath" . }}
+          imagePullPolicy: {{ template "eric-oss-cell-sleep.registryImagePullPolicy" . }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - all
+          volumeMounts:
+            - mountPath: /tmp
+              name: tmp-volume
+            - name: config-volume
+              mountPath: /config
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+          {{- if (index .Values "probes" "eric-oss-cell-sleep" "livenessProbe" "initialDelaySeconds") }}
+            {{ print "initialDelaySeconds: " (index .Values "probes" "eric-oss-cell-sleep" "livenessProbe" "initialDelaySeconds") }}
+          {{- end }}
+          {{- if (index .Values "probes" "eric-oss-cell-sleep" "livenessProbe" "failureThreshold") }}
+            {{ print "failureThreshold: " (index .Values "probes" "eric-oss-cell-sleep" "livenessProbe" "failureThreshold") }}
+          {{- end }}
+          {{- if (index .Values "probes" "eric-oss-cell-sleep" "livenessProbe" "periodSeconds") }}
+            {{ print "periodSeconds: " (index .Values "probes" "eric-oss-cell-sleep" "livenessProbe" "periodSeconds") }}
+          {{- end }}
+          {{- if (index .Values "probes" "eric-oss-cell-sleep" "livenessProbe" "timeoutSeconds") }}
+            {{ print "timeoutSeconds: " (index .Values "probes" "eric-oss-cell-sleep" "livenessProbe" "timeoutSeconds") }}
+          {{- end }}
+            httpGet:
+              path: /actuator/health
+              port: http
+          readinessProbe:
+          {{- if (index .Values "probes" "eric-oss-cell-sleep" "readinessProbe" "initialDelaySeconds") }}
+            {{ print "initialDelaySeconds: " (index .Values "probes" "eric-oss-cell-sleep" "readinessProbe" "initialDelaySeconds") }}
+          {{- end }}
+          {{- if (index .Values "probes" "eric-oss-cell-sleep" "readinessProbe" "failureThreshold") }}
+            {{ print "failureThreshold: " (index .Values "probes" "eric-oss-cell-sleep" "readinessProbe" "failureThreshold") }}
+          {{- end }}
+          {{- if (index .Values "probes" "eric-oss-cell-sleep" "readinessProbe" "periodSeconds") }}
+            {{ print "periodSeconds: " (index .Values "probes" "eric-oss-cell-sleep" "readinessProbe" "periodSeconds") }}
+          {{- end }}
+          {{- if (index .Values "probes" "eric-oss-cell-sleep" "readinessProbe" "timeoutSeconds") }}
+            {{ print "timeoutSeconds: " (index .Values "probes" "eric-oss-cell-sleep" "readinessProbe" "timeoutSeconds") }}
+          {{- end }}
+            httpGet:
+              path: /actuator/health
+              port: http
+          env:
+          - name: JAVA_OPTS
+            value: {{ include "eric-oss-cell-sleep.jvmHeapSettings" . }}
+          - name: TZ
+            value: {{ template "eric-oss-cell-sleep.timezone" . }}
+      {{- if .Values.global }}
+        {{- if .Values.global.security }}
+          {{- if .Values.global.security.tls }}
+            {{- if .Values.global.security.tls.enabled }}
+          - name: CONNECT_MODE
+            value: "tls"
+            {{- if (eq .Values.service.endpoints.chassisapi.tls.enforced "required") }}
+          - name: TLS_MODE
+            value: "only_tls"
+            {{- if (eq .Values.service.endpoints.chassisapi.tls.verifyClientCertificate "required") }}
+          - name: TLS_CA
+            value: "ca_path"
+            {{- end }}
+            {{- end }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+          resources:
+            requests:
+            {{- if (index .Values "resources" "eric-oss-cell-sleep" "requests" "cpu") }}
+              cpu: {{ (index .Values "resources" "eric-oss-cell-sleep" "requests" "cpu" | quote) }}
+            {{- end }}
+            {{- if (index .Values "resources" "eric-oss-cell-sleep" "requests" "memory") }}
+              memory: {{ (index .Values "resources" "eric-oss-cell-sleep" "requests" "memory" | quote) }}
+            {{- end }}
+            {{- if (index .Values "resources" "eric-oss-cell-sleep" "requests" "ephemeral-storage") }}
+            {{ println "  ephemeral-storage:" (index .Values "resources" "eric-oss-cell-sleep" "requests" "ephemeral-storage" | quote) }}
+            {{- end }}
+            limits:
+            {{- if (index .Values "resources" "eric-oss-cell-sleep" "limits" "cpu") }}
+              cpu: {{ (index .Values "resources" "eric-oss-cell-sleep" "limits" "cpu" | quote) }}
+            {{- end }}
+            {{- if (index .Values "resources" "eric-oss-cell-sleep" "limits" "memory") }}
+              memory: {{ (index .Values "resources" "eric-oss-cell-sleep" "limits" "memory" | quote) }}
+            {{- end }}
+            {{- if (index .Values "resources" "eric-oss-cell-sleep" "limits" "ephemeral-storage") }}
+            {{ println "  ephemeral-storage:" (index .Values "resources" "eric-oss-cell-sleep" "limits" "ephemeral-storage" | quote) }}
+            {{- end }}
+      nodeSelector: {{ include "eric-oss-cell-sleep.nodeSelector" . | nindent 6 -}}
+
+      {{- if .Values.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds:
+        {{- include "eric-oss-cell-sleep.terminationGracePeriodSeconds" . | nindent 8 }}
+      {{- end }}
+
+      {{- if .Values.tolerations }}
+      tolerations:
+        {{- include "eric-oss-cell-sleep.tolerations" . | nindent 8 }}
+      {{- end }}
+
+      {{- if (index .Values "podPriority" "eric-oss-cell-sleep" "priorityClassName") }}
+      priorityClassName: {{ (index .Values "podPriority" "eric-oss-cell-sleep" "priorityClassName") }}
+      {{- end }}
+
+      {{- with .Values.topologySpreadConstraints.deployment }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- if eq .Values.affinity.podAntiAffinity "hard" }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - {{ include "eric-oss-cell-sleep.name" . }}
+            topologyKey: "kubernetes.io/hostname"
+      {{- else if eq .Values.affinity.podAntiAffinity  "soft" }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ include "eric-oss-cell-sleep.name" . }}
+              topologyKey: "kubernetes.io/hostname"
+      {{- end }}
